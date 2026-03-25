@@ -1,0 +1,7 @@
+__pycache__/
+*.exe
+.venv/
+*experiments.py
+temp/
+.vscode/
+anytime.png

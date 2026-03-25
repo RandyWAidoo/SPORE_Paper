@@ -1,0 +1,11 @@
+numpy==2.2.1
+scikit-learn==1.6.1
+clustpy==0.0.2
+hnswlib==0.8.0
+tqdm==4.67.1
+scipy==1.14.1
+hdbscan==0.8.40
+pandas==2.2.3
+scipy==1.14.1
+statsmodels
+spore-clustering==0.1.0b2
