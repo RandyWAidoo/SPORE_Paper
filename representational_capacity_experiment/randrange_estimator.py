@@ -1,68 +1,61 @@
 import numpy as np
-from scipy.stats import randint
+from scipy.stats import randint, uniform
 
-def suggest_hdbscan_bands(X, rng=None):
-    n, _ = X.shape
-    rng = np.random.default_rng() if rng is None else rng
-
-    mcs_candidates = (np.array([0.005, 0.01, 0.02, 0.05]) * n).astype(int)
-    mcs_candidates = np.unique(np.clip(mcs_candidates, 2, n - 1))
-    mcs_low = int(np.min(mcs_candidates))
-    mcs_high = int(np.max(mcs_candidates))
-    if mcs_high <= mcs_low:
-        mcs_high = min(n - 1, mcs_low + 1)
-
-    ms_low, ms_high = 1, int(min(n - 1, np.log2(n)))
-
-    return {
-        "mcs_low": mcs_low,
-        "mcs_high": mcs_high,
-        "ms_low": ms_low,
-        "ms_high": ms_high,
-    }
-
-def suggest_n_neighbors(n):
-    lbound = int(np.ceil(np.log(n)))
-    ubound = int(max(lbound + 1, min( 100, np.ceil(np.sqrt(n)) ))) 
-    return {"n_low": lbound, "n_high": ubound}
-
-
-# --------------------------------------------------------------------------- #
-# Distribution builders
-# --------------------------------------------------------------------------- #
 
 def get_kmeans_ranges(X, n_clusters, random_state):
     return {
         'n_clusters': [n_clusters],
         'init': ['k-means++'], 
+        'n_init': [5],
         'random_state': [random_state],
     }
 
-
-def get_hdbscan_ranges(X, metric="euclidean", rng=None):
-    b = suggest_hdbscan_bands(X, rng=rng)
+def get_hdbscan_ranges(X):
+    n, _ = X.shape
+    ms_low, ms_high = 1, int(min(n - 1, 2*np.log2(n)))
     return {
-        'min_cluster_size': randint(b["mcs_low"], b["mcs_high"] + 1),
-        'min_samples': randint(b["ms_low"], b["ms_high"] + 1),
-        'metric': [metric],
+        'min_cluster_size': randint(int(n**0.3), int(n**0.7) + 1),
+        'min_samples': randint(ms_low, ms_high + 1),
+        'cluster_selection_method': ['leaf', 'eom'],
     }
 
-
-def get_spectral_ranges(X, n_clusters, random_state):
-    nneighbors = suggest_n_neighbors(X.shape[0])
+def get_dbscan_ranges(X):
+    N, D = X.shape
+    sqN  = np.sqrt(N)
+ 
+    ms_low  = int(min(sqN, D))
+    ms_high = int(min(N, 3 * sqN, 3 * D))
+    ms_low  = max(1, ms_low)               # must be >= 1
+    ms_high = max(ms_low, ms_high)
+ 
     return {
-        'n_clusters': [n_clusters],
-        'affinity': ['nearest_neighbors'],
-        'n_neighbors': randint(nneighbors['n_low'], nneighbors['n_high'] + 1),
-        'assign_labels': ['kmeans'],
-        'random_state': [random_state],
+        'min_samples': randint(ms_low, ms_high + 1),
+        'q_eps':       uniform(loc=12.5, scale=100 - 12.5),
+    }
+ 
+ 
+def get_dpc_ranges(X, k):
+    return {
+        'q_dc': uniform(loc=0, scale=50.0 - 0),
+        'k':    [k],
+    }
+ 
+ 
+def get_snn_dbscan_ranges(X):
+    N, D = X.shape
+    sqN  = np.sqrt(N)
+ 
+    k_low  = max(1, int(np.log2(N)))
+    k_high = max(k_low, int(sqN))
+ 
+    ms_low  = int(min(sqN, D))
+    ms_high = int(min(N, 3 * sqN, 3 * D))
+    ms_low  = max(1, ms_low)
+    ms_high = max(ms_low, ms_high)
+ 
+    return {
+        'k':           randint(k_low, k_high + 1),
+        'f':           uniform(loc=0.0, scale=0.875 - 0.0),
+        'min_samples': randint(ms_low, ms_high + 1),
     }
 
-
-def get_gmm_ranges(X, n_clusters, random_state):
-    return {
-        'n_components': [n_clusters],
-        'covariance_type': ['full', 'tied', 'diag', 'spherical'],
-        'init_params': ['k-means++'],
-        'random_state': [random_state],
-    }

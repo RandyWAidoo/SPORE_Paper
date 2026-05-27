@@ -8,4 +8,4 @@ hdbscan==0.8.40
 pandas==2.2.3
 scipy==1.14.1
 statsmodels
-spore-clustering==0.1.0b2
+spore-clustering

@@ -27,6 +27,7 @@ if __name__ == "__main__":
 
     from pprint import pprint
 
+    from spore_clustering import SPORE
     from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
     from .ZMinmaxScaler import ZMinmaxScaler
 
@@ -35,11 +36,10 @@ if __name__ == "__main__":
 
     from .run_with_timeout_and_buffer import run_with_timeout_and_buffer
     from .randsearch import randsearch
-
-    from spore_clustering import SPORE
-    from sklearn.cluster import KMeans, SpectralClustering
+    
+    from sklearn.cluster import KMeans
     from hdbscan import HDBSCAN
-    from sklearn.mixture import GaussianMixture
+    from .reparameterized import DBSCAN_, DPC, SNN_DBSCAN
 
     from .confidence_interval import confidence_interval
     from argparse import ArgumentParser
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         "--area_limit", required=False, type=float, default=float("inf"),
         help="The maximum 'area' of a dataset (NxD') that should be processed. Others will be skipped"
     )
-    AP.add_argument('-i', '--include', help="Included algorithms separated by a space", type=str, default="spore-fixed-grid kmeans hdbscan spectral gmm")
+    AP.add_argument('-i', '--include', help="Included algorithms separated by a space", type=str, default="spore kmeans hdbscan dbscan dpc snn_dbscan")
     AP.add_argument('--internal_metrics', help='Include internal metrics in evaluation?', action='store_true', default=False)
     AP.add_argument('-o', '--output', help=r"Which directory to save results in", default=None)
     AP.add_argument('-t', '--tuning_time', help="Max number of seconds an algorithm can be tuned", type=float, default=120.0)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     AP.add_argument('--var_trials', help="Number of trials to measure variance with the final config", type=int, default=10)
 
     AP.add_argument('--approx', help="Use approximate knn instead of exact?", action='store_true', default=False)
-    AP.add_argument('--mcs', help="A single value for spore's minimum cluster size",  default=None, type=int)
+    AP.add_argument('--msr', help="A single value for spore's maximum SCR rounds",  default=None, type=int)
     AP.add_argument('--seeding_order', help="One of 'none', 'random', 'density'(default)", default="density")
 
 
@@ -87,8 +87,16 @@ if __name__ == "__main__":
     records = []
     dsets = [x[:x.rfind(' ')] for x in open(args.list_path).read().split('\n') if x]
     dimensions = [int(x[x.rfind(' '):]) for x in open(args.list_path).read().split('\n') if x]
-    methods = {"spore-fixed-grid": SPORE, "spore-rand-grid": SPORE, "kmeans": KMeans, "spectral": SpectralClustering, "gmm": GaussianMixture, "hdbscan": HDBSCAN}
-    true_names = {"spore-fixed-grid": "SPORE", "spore-rand-grid": "SPORE", "kmeans": "KMeans", "hdbscan": "HDBSCAN", "spectral": "Spectral", "gmm": "GMM",}
+    methods = {
+        "spore": SPORE,
+        "kmeans": KMeans, 
+        "hdbscan": HDBSCAN, "dbscan": DBSCAN_, "snn_dbscan": SNN_DBSCAN, "dpc": DPC,
+    }
+    true_names = {
+        "spore": "SPORE",
+        "kmeans": "KMeans", 
+        "hdbscan": "HDBSCAN", "dbscan": "DBSCAN", "snn_dbscan": "SNN_DBSCAN", "dpc": "DPC",
+    }
 
     for x in list(methods.keys()):
         if x not in args.include:
@@ -140,8 +148,8 @@ if __name__ == "__main__":
                     shuffle_for_hnsw=True, seeding_order=args.seeding_order, shuffle_seed=RANDOM_STATE,
                     exact_knn=(not args.approx),
                 )
-                if args.mcs is not None:
-                    spore_extra_kwargs['min_cluster_size'] = args.mcs
+                if args.msr is not None:
+                    spore_extra_kwargs['max_scr_rounds'] = args.msr
                 
                 outcome = default_outcome = SimpleNamespace(duration_s=0.0, last={}, error="") 
                 anytime_results, everytime_results = [], []
@@ -170,10 +178,10 @@ if __name__ == "__main__":
                 y_s = []
                 for i in tqdm(range(VAR_TRIALS), desc="Measuring variance"):
                     run_params = best_params.copy()
-                    if name.split('-')[0] == "spore": 
+                    if name == "spore": 
                         run_params.update(spore_extra_kwargs)
 
-                    if name.split('-')[0] == "spore":
+                    if name == "spore":
                         clust_seed = SEEDS[i]
                         if not run_params.get("exact_knn", True):
                             run_params["shuffle_for_hnsw"] = True
@@ -248,6 +256,6 @@ if __name__ == "__main__":
     print(f"\033[92m---------------Final Results---------------\033[0m")
     print(all_results_df)
     if args.overwrite:
-        base_path = os.path.join(args.output, f"exact-knn-{(not args.approx)}_seed-{args.seed}_n-jobs-{args.n_jobs}_tuning-time-{args.tuning_time}s_scaler-{args.scaler}_mcs-{args.mcs}_seeding-order-{args.seeding_order}")
+        base_path = os.path.join(args.output, f"exact-knn-{(not args.approx)}_seed-{args.seed}_n-jobs-{args.n_jobs}_tuning-time-{args.tuning_time}s_scaler-{args.scaler}_msr-{args.msr}_seeding-order-{args.seeding_order}")
         all_results_df.to_csv(base_path + ".csv", index=False)
         all_results_df.to_html(base_path + ".html", index=False)

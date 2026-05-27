@@ -27,7 +27,7 @@ for algo, tbl in df.groupby("Algorithm"):
 for algo, anyt in algo_to_anyt.items():
     plt.plot(list(range(1, len(anyt) + 1)), anyt, label=algo, marker='o', markersize=4, linewidth=2)
 plt.xlabel("Trial")
-plt.ylabel("Average Best-So-Far ARI")
+plt.ylabel("Average Highest-Achieved ARI")
 plt.legend(loc="lower center", bbox_to_anchor=(0.53, -0.35), ncol=3) 
 plt.savefig(os.path.join(os.path.dirname(__file__), "anytime.png"), dpi=300, bbox_inches="tight", pad_inches=0.1, )
 plt.show()
